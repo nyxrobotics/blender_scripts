@@ -47,6 +47,13 @@ def main(context, prefix):
         ros_rotation_euler = obj.rotation_euler.copy()
         ros_rotation_euler.rotate(rotation_matrix)
 
+        # Adjust yaw by +90 degrees (+1.5708 radians)
+        ros_rotation_euler.z += math.radians(90)
+
+        # Swap the x and y dimensions to match the new orientation
+        adjusted_dx = dy
+        adjusted_dy = dx
+
         # Create the cube without rotation
         bpy.ops.mesh.primitive_cube_add(location=loc)
         new_obj = bpy.context.object
@@ -57,12 +64,13 @@ def main(context, prefix):
         # Apply the rotation after creation
         new_obj.rotation_euler = obj.rotation_euler
 
+
         generated_objs.append(new_obj)
 
-        # Print the output in the specified format with ROS coordinates and orientation
+        # Print the output in the specified format with ROS coordinates and adjusted orientation
         print(f'  <origin xyz="{ros_loc.x:.4f} {ros_loc.y:.4f} {ros_loc.z:.4f}" rpy="{ros_rotation_euler.x:.4f} {ros_rotation_euler.y:.4f} {ros_rotation_euler.z:.4f}"/>')
         print(f'  <geometry>')
-        print(f'    <box size="{dx:.4f} {dy:.4f} {dz:.4f}"/>')
+        print(f'    <box size="{adjusted_dx:.4f} {adjusted_dy:.4f} {dz:.4f}"/>')
         print(f'  </geometry>')
 
     for obj in generated_objs:
