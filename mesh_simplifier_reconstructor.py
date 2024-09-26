@@ -1,6 +1,6 @@
 bl_info = {
     "name": "Mesh Simplifier and Shape Reconstructor",
-    "blender": (2, 80, 0),
+    "blender": (2, 82, 0),
     "category": "Object",
 }
 
@@ -9,7 +9,7 @@ import bmesh
 import mathutils
 import math
 
-def apply_decimate_modifier(obj, max_vertices=1000):
+def apply_decimate_modifier(obj, max_vertices=10000):
     """ Decimateモディファイアを適用し、頂点数を削減 """
     current_vertices = len(obj.data.vertices)
     
@@ -32,6 +32,8 @@ def detect_surface_groups(mesh, tolerance=0.01):
     curved_surfaces = []
     visited_faces = set()
 
+    print("平面と曲面を検出中...")
+
     for face in mesh.polygons:
         if face.index not in visited_faces:
             if is_flat_surface(face, tolerance):
@@ -45,6 +47,7 @@ def detect_surface_groups(mesh, tolerance=0.01):
                 explore_connected_faces(mesh, face, group, visited_faces, tolerance)
                 curved_surfaces.append(group)
 
+    print(f"検出された平面群: {len(flat_surfaces)}, 曲面群: {len(curved_surfaces)}")
     return flat_surfaces, curved_surfaces
 
 def explore_connected_faces(mesh, face, group, visited_faces, tolerance):
@@ -63,8 +66,9 @@ def is_flat_surface(face, tolerance=0.01):
 
 def process_connected_surfaces(flat_surfaces, curved_surfaces):
     """ 平面を優先し、面積が大きい方を優先して接続処理を行う """
-    # 平面と曲面を処理。平面は曲面よりも優先。
+    print("平面を処理中...")
     process_flat_surfaces(flat_surfaces)
+    print("曲面を処理中...")
     process_curved_surfaces(curved_surfaces)
     
 def process_flat_surfaces(flat_surfaces):
@@ -76,6 +80,7 @@ def process_flat_surfaces(flat_surfaces):
         for other_surface in sorted_flat:
             if flat_surface != other_surface:
                 connect_surfaces(flat_surface, other_surface, "flat")
+                bpy.context.window_manager.progress_update(len(flat_surface))
 
 def process_curved_surfaces(curved_surfaces):
     """ 曲面同士を処理 """
@@ -86,6 +91,7 @@ def process_curved_surfaces(curved_surfaces):
         for other_surface in sorted_curved:
             if curved_surface != other_surface:
                 connect_surfaces(curved_surface, other_surface, "curved")
+                bpy.context.window_manager.progress_update(len(curved_surface))
 
 def connect_surfaces(group1, group2, surface_type):
     """ 平面または曲面を接続して正しくエッジで合わせる """
@@ -100,13 +106,11 @@ def connect_surfaces(group1, group2, surface_type):
                         v1_1, v1_2 = bm.verts[edge1[0]], bm.verts[edge1[1]]
                         v2_1, v2_2 = bm.verts[edge2[0]], bm.verts[edge2[1]]
                         
-                        # 頂点が微小にズレている場合には調整
                         if (v1_1.co - v2_1.co).length > 0.001:
                             v1_1.co = v2_1.co
                         if (v1_2.co - v2_2.co).length > 0.001:
                             v1_2.co = v2_2.co
                         
-                        # エッジ同士を結合
                         bmesh.ops.weld_verts(bm, targetmap={v1_1: v2_1, v1_2: v2_2})
 
     bm.to_mesh(bpy.context.object.data)
@@ -170,7 +174,7 @@ def apply_manifold_cleanup(obj):
     bpy.ops.object.mode_set(mode='OBJECT')
     print("法線を再計算しました。")
 
-def process_mesh(obj, max_vertices=1000000, tolerance=0.01, area_threshold=0.05):
+def process_mesh(obj, max_vertices=10000, tolerance=0.01, area_threshold=0.05):
     """ メッシュの処理を行うメイン関数 """
     apply_decimate_modifier(obj, max_vertices=max_vertices)
     mesh = obj.data
@@ -194,7 +198,7 @@ class OBJECT_OT_simplify_and_reconstruct(bpy.types.Operator):
     bl_label = "Simplify and Reconstruct Mesh"
     bl_options = {'REGISTER', 'UNDO'}
     
-    max_vertices: bpy.props.IntProperty(name="Max Vertices", default=1000000)
+    max_vertices: bpy.props.IntProperty(name="Max Vertices", default=10000)
     
     def execute(self, context):
         obj = context.active_object
@@ -202,7 +206,13 @@ class OBJECT_OT_simplify_and_reconstruct(bpy.types.Operator):
             self.report({'ERROR'}, "選択されたオブジェクトはメッシュではありません。")
             return {'CANCELLED'}
         
-        process_mesh(obj, max_vertices=self.max_vertices)
+        # 処理の進行状況をトラッキング
+        bpy.context.window_manager.progress_begin(0, 100)
+        
+        try:
+            process_mesh(obj, max_vertices=self.max_vertices)
+        finally:
+            bpy.context.window_manager.progress_end()
         
         self.report({'INFO'}, "メッシュの簡略化と再構成が完了しました。")
         return {'FINISHED'}
@@ -220,4 +230,3 @@ def unregister():
 
 if __name__ == "__main__":
     register()
-
