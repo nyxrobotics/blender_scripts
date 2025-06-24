@@ -7,7 +7,7 @@
 
 ## Features
 
-- Adds an operator to Blender’s **Object > Context Menu**.
+- Adds an operator to Blender that can be called via the search menu (F3).
 - Generates bounding box shapes (`<geometry><box></box></geometry>`) for selected mesh objects.
 - Converts Blender coordinates to ROS (URDF) coordinate system.
 - Outputs `<origin>` and `<geometry>` tags for URDF.
@@ -15,7 +15,10 @@
 
 ## Requirements
 
-- Blender 2.80 or newer
+- **Blender 2.80 or newer (tested on 2.82)**  
+  👉 You can download Blender 2.82 here:  
+  [https://download.blender.org/release/Blender2.82/](https://download.blender.org/release/Blender2.82/)
+
 - ROS or any system where URDF files are used
 
 ## Installation
@@ -29,12 +32,16 @@
 
 ## Usage
 
-1. In your 3D viewport, select the mesh objects you want to process.
-2. Right-click to open the **Context Menu**.
-3. Click **Generate bounding box shapes for all selected objects** (added by this add-on).
-4. Open Blender’s **System Console** (if not already open):
+1. Select one or more mesh objects in the 3D Viewport.
+2. Press `F3` (or `Space` depending on keymap) to open the search menu.
+3. Type:
+   ```
+   Generate bounding box shapes for all selected objects
+   ```
+   and run the operator.
+4. Open Blender’s **System Console** to view output:
    - On Windows: **Window > Toggle System Console**
-   - On macOS/Linux: Run Blender from a terminal to see the output
+   - On macOS/Linux: Run Blender from terminal to see output
 5. Copy the printed URDF XML and paste it into your URDF file.
 
 ## Example URDF Output
@@ -49,8 +56,8 @@
 ## Notes
 
 - The output uses ROS's coordinate system (X forward, Y left, Z up).
-- The generated cube objects are added to your scene for verification.
-- You can change the name prefix (`UCX_`) in the operator’s options.
+- The generated cube objects are added to your scene for visual confirmation.
+- You can change the name prefix (`UCX_`) in the operator’s options (visible in the F3 search operator input).
 
 ## License
 
