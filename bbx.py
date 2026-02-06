@@ -41,7 +41,7 @@ def main(context, prefix):
 
         # Convert Blender coordinates to ROS coordinates by rotating -90 degrees around Z-axis
         rotation_matrix = mathutils.Matrix.Rotation(-math.radians(90), 4, 'Z')
-        ros_loc = rotation_matrix @ loc
+        ros_loc = loc
         
         # Also rotate the orientation to match ROS coordinate system
         ros_rotation_euler = obj.rotation_euler.copy()
@@ -51,8 +51,8 @@ def main(context, prefix):
         ros_rotation_euler.z += math.radians(90)
 
         # Swap the x and y dimensions to match the new orientation
-        adjusted_dx = dy
-        adjusted_dy = dx
+        adjusted_dx = dx
+        adjusted_dy = dy
 
         # Create the cube without rotation
         bpy.ops.mesh.primitive_cube_add(location=loc)
