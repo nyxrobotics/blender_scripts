@@ -52,7 +52,7 @@ class VIEW3D_PT_robotics_tools(bpy.types.Panel):
         col.label(text="URDF / Bounding Box")
         col.operator(
             bounding_box.GenerateBoundingBoxesOperator.bl_idname,
-            text="Generate Bounding Boxes",
+            text="Generate Bounding Box",
         )
 
         layout.separator()
@@ -67,6 +67,8 @@ class VIEW3D_PT_robotics_tools(bpy.types.Panel):
 
 classes = (
     bounding_box.GenerateBoundingBoxesOperator,
+    bounding_box.BBX_OT_show_output,
+    bounding_box.BBX_OT_copy_output,
     mesh_reconstructor.OBJECT_OT_simplify_and_reconstruct,
     VIEW3D_PT_robotics_tools,
 )

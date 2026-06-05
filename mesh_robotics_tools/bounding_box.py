@@ -1,12 +1,18 @@
 # -*- coding: utf-8 -*-
 """
-Generate bounding box shapes (URDF 出力)
+Generate Bounding Box (URDF/xacro 出力)
 
-選択メッシュごとにバウンディングボックスを生成し、ROS(URDF)向けの
-<origin> / <geometry> タグをコンソールへ出力する。
+選択メッシュごとにバウンディングボックスを生成し、ROS(URDF/xacro) 向けの
+<origin> / <geometry> タグを出力する。
+
+出力は以下の 3 か所に同時に出される（内容は同一）:
+  - システムコンソール（従来どおり print）
+  - クリップボード（実行直後にそのまま貼り付け可能）
+  - テキストデータブロック "bounding_box_urdf.xacro"（テキストエディタで閲覧/編集可）
+さらに、実行後にプレビュー用のポップアップウィンドウを表示する。
 
 元スクリプト: bbx.py / author: Jonatan Bijl
-機能（計算・出力内容）は元のまま変更していません。
+バウンディングボックスの計算・XML の内容は元のまま変更していません。
 """
 
 import bpy
@@ -14,11 +20,18 @@ import mathutils
 import math
 from bpy.props import StringProperty
 
+# 直近の出力（ポップアップ/再コピー用）
+_LAST_OUTPUT = ""
+
+# 出力を書き込むテキストデータブロック名
+TEXT_BLOCK_NAME = "bounding_box_urdf.xacro"
+
 
 def main(context, prefix):
     # make a list of the selected objects of type 'mesh'
     objs = [obj for obj in context.selected_objects if obj.type == 'MESH']
     generated_objs = []
+    lines = []
 
     bpy.ops.object.select_all(action='DESELECT')
 
@@ -68,20 +81,77 @@ def main(context, prefix):
 
         generated_objs.append(new_obj)
 
-        # Print the output in the specified format with ROS coordinates and adjusted orientation
-        print(f'  <origin xyz="{ros_loc.x:.4f} {ros_loc.y:.4f} {ros_loc.z:.4f}" rpy="{ros_rotation_euler.x:.4f} {ros_rotation_euler.y:.4f} {ros_rotation_euler.z:.4f}"/>')
-        print(f'  <geometry>')
-        print(f'    <box size="{adjusted_dx:.4f} {adjusted_dy:.4f} {dz:.4f}"/>')
-        print(f'  </geometry>')
+        # Build the output in the specified format with ROS coordinates and adjusted orientation
+        block = [
+            f'  <origin xyz="{ros_loc.x:.4f} {ros_loc.y:.4f} {ros_loc.z:.4f}" rpy="{ros_rotation_euler.x:.4f} {ros_rotation_euler.y:.4f} {ros_rotation_euler.z:.4f}"/>',
+            f'  <geometry>',
+            f'    <box size="{adjusted_dx:.4f} {adjusted_dy:.4f} {dz:.4f}"/>',
+            f'  </geometry>',
+        ]
+        for line in block:
+            print(line)  # 従来どおりコンソールにも出力
+        lines.extend(block)
 
     for obj in generated_objs:
         obj.select_set(True)
 
+    return "\n".join(lines)
+
+
+def _write_to_text_block(text):
+    """出力をテキストデータブロックへ書き込む（テキストエディタで開ける）。"""
+    txt = bpy.data.texts.get(TEXT_BLOCK_NAME)
+    if txt is None:
+        txt = bpy.data.texts.new(TEXT_BLOCK_NAME)
+    txt.clear()
+    txt.write(text)
+    return txt
+
+
+class BBX_OT_copy_output(bpy.types.Operator):
+    """直近の出力をもう一度クリップボードへコピー"""
+    bl_idname = "object.bbx_copy_output"
+    bl_label = "Copy to Clipboard"
+    bl_options = {'INTERNAL'}
+
+    def execute(self, context):
+        context.window_manager.clipboard = _LAST_OUTPUT
+        self.report({'INFO'}, "クリップボードにコピーしました。")
+        return {'FINISHED'}
+
+
+class BBX_OT_show_output(bpy.types.Operator):
+    """直近の出力をポップアップウィンドウで表示"""
+    bl_idname = "object.bbx_show_output"
+    bl_label = "Bounding Box URDF / xacro"
+    bl_options = {'INTERNAL'}
+
+    def execute(self, context):
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_popup(self, width=560)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text="クリップボードにコピー済み / Text: '%s'" % TEXT_BLOCK_NAME, icon='TEXT')
+        layout.operator(BBX_OT_copy_output.bl_idname, icon='COPYDOWN')
+        box = layout.box()
+        col = box.column(align=True)
+        if _LAST_OUTPUT.strip():
+            for line in _LAST_OUTPUT.split("\n"):
+                # ラベルは先頭の空白を詰めるため、インデントは "." で可視化
+                indent = len(line) - len(line.lstrip(" "))
+                shown = ("." * indent) + line.lstrip(" ") if indent else line
+                col.label(text=shown if shown else " ")
+        else:
+            col.label(text="(出力はありません)")
+
 
 class GenerateBoundingBoxesOperator(bpy.types.Operator):
-    """Create a joined copy of selected meshes, with modifiers applied if needed"""
+    """Create a bounding cube object for each selected object and output URDF/xacro"""
     bl_idname = "object.generate_bounding_boxes"
-    bl_label = "Generate bounding box shapes for all selected objects"
+    bl_label = "Generate Bounding Box"
     bl_options = {'REGISTER', 'UNDO'}
 
     name_prefix: StringProperty(
@@ -95,9 +165,25 @@ class GenerateBoundingBoxesOperator(bpy.types.Operator):
         return len(context.selected_objects) > 0
 
     def execute(self, context):
-        main(context, self.name_prefix)
+        global _LAST_OUTPUT
+        text = main(context, self.name_prefix)
+        _LAST_OUTPUT = text
+
+        if text.strip():
+            # クリップボード & テキストデータブロックへ出力
+            context.window_manager.clipboard = text
+            _write_to_text_block(text)
+            self.report(
+                {'INFO'},
+                "URDF/xacro をクリップボードと Text '%s' に出力しました。" % TEXT_BLOCK_NAME,
+            )
+            # プレビューウィンドウを表示
+            bpy.ops.object.bbx_show_output('INVOKE_DEFAULT')
+        else:
+            self.report({'WARNING'}, "メッシュオブジェクトが選択されていません。")
+
         return {'FINISHED'}
 
 
 def menu_func(self, context):
-    self.layout.operator(GenerateBoundingBoxesOperator.bl_idname)
+    self.layout.operator(GenerateBoundingBoxesOperator.bl_idname, text="Generate Bounding Box")
