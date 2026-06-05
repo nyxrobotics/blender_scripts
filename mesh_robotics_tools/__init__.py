@@ -2,12 +2,11 @@
 """
 Mesh & Robotics Tools
 
-2つのツールを 1 つのアドオンにまとめたもの:
-  1. Generate bounding box shapes  : 選択メッシュから URDF 用バウンディングボックスを生成
+2 つのツールを 1 つのアドオンにまとめたもの:
+  1. Generate Bounding Box        : 選択メッシュから URDF/xacro 用バウンディングボックスを生成
   2. Simplify and Reconstruct Mesh : メッシュ簡略化・形状再構成
 
-Blender 2.80 〜 最新系まで、従来形式（レガシー）アドオンとして 1 つの zip で導入できます。
-各ツールの機能（処理内容）は元のスクリプトから変更していません。
+Blender 2.80 〜 最新系まで、1 つの zip で導入できる。
 """
 
 bl_info = {
@@ -77,7 +76,7 @@ classes = (
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
-    # Object メニューにも追加してアクセスしやすくする（操作内容は同一）
+    # Object メニューにも追加してアクセスしやすくする
     bpy.types.VIEW3D_MT_object.append(bounding_box.menu_func)
     bpy.types.VIEW3D_MT_object.append(mesh_reconstructor.menu_func)
 

@@ -5,12 +5,9 @@ Mesh Simplifier and Shape Reconstructor
 メッシュを Decimate で簡略化し、平面/曲面の検出・接続・交差処理・隙間埋め・
 多様体化を行う。
 
-元スクリプト: mesh_simplifier_reconstructor.py
-機能（処理アルゴリズム）は元のまま変更していません。
-バージョン互換のための差し替えのみ行っています:
-  - remove_doubles を compat 経由に変更（新旧 Blender 対応）
-  - ProcessPoolExecutor が使えない環境（多くの Blender 内蔵 Python が該当）でも
-    動くよう、逐次処理へのフォールバックを追加（結果は同一）
+面の分類は並列処理を試み、利用できない環境（Blender 内蔵 Python では
+ProcessPoolExecutor を生成できないことがある）では逐次処理で実行する。
+重複頂点の結合は新旧どちらの Blender でも動くよう compat 経由で呼び出す。
 """
 
 import bpy

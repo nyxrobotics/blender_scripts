@@ -2,22 +2,23 @@
 """
 Generate Bounding Box (URDF/xacro 出力)
 
-選択メッシュごとにバウンディングボックスを生成し、ROS(URDF/xacro) 向けの
+選択メッシュごとにバウンディングボックスを生成し、URDF/xacro 形式の
 <origin> / <geometry> タグを出力する。
 
+座標・寸法は Blender の座標系で出力する。座標系の変換が必要な場合は
+URDF/xacro へのインポート時に行う。
+
 出力は以下の 3 か所に同時に出される（内容は同一）:
-  - システムコンソール（従来どおり print）
+  - システムコンソール（print）
   - クリップボード（実行直後にそのまま貼り付け可能）
   - テキストデータブロック "bounding_box_urdf.xacro"（テキストエディタで閲覧/編集可）
 さらに、実行後にプレビュー用のポップアップウィンドウを表示する。
 
-元スクリプト: bbx.py / author: Jonatan Bijl
-バウンディングボックスの計算・XML の内容は元のまま変更していません。
+author: Jonatan Bijl
 """
 
 import bpy
 import mathutils
-import math
 from bpy.props import StringProperty
 
 # 直近の出力（ポップアップ/再コピー用）
@@ -54,21 +55,6 @@ def main(context, prefix):
         loc.rotate(obj.rotation_euler)
         loc = loc + obj.location
 
-        # Convert Blender coordinates to ROS coordinates by rotating -90 degrees around Z-axis
-        rotation_matrix = mathutils.Matrix.Rotation(-math.radians(90), 4, 'Z')
-        ros_loc = rotation_matrix @ loc
-
-        # Also rotate the orientation to match ROS coordinate system
-        ros_rotation_euler = obj.rotation_euler.copy()
-        ros_rotation_euler.rotate(rotation_matrix)
-
-        # Adjust yaw by +90 degrees (+1.5708 radians)
-        ros_rotation_euler.z += math.radians(90)
-
-        # Swap the x and y dimensions to match the new orientation
-        adjusted_dx = dy
-        adjusted_dy = dx
-
         # Create the cube without rotation
         bpy.ops.mesh.primitive_cube_add(location=loc)
         new_obj = bpy.context.object
@@ -81,15 +67,16 @@ def main(context, prefix):
 
         generated_objs.append(new_obj)
 
-        # Build the output in the specified format with ROS coordinates and adjusted orientation
+        # Build the output in Blender coordinates (no coordinate-system conversion)
+        rot = obj.rotation_euler
         block = [
-            f'  <origin xyz="{ros_loc.x:.4f} {ros_loc.y:.4f} {ros_loc.z:.4f}" rpy="{ros_rotation_euler.x:.4f} {ros_rotation_euler.y:.4f} {ros_rotation_euler.z:.4f}"/>',
+            f'  <origin xyz="{loc.x:.4f} {loc.y:.4f} {loc.z:.4f}" rpy="{rot.x:.4f} {rot.y:.4f} {rot.z:.4f}"/>',
             f'  <geometry>',
-            f'    <box size="{adjusted_dx:.4f} {adjusted_dy:.4f} {dz:.4f}"/>',
+            f'    <box size="{dx:.4f} {dy:.4f} {dz:.4f}"/>',
             f'  </geometry>',
         ]
         for line in block:
-            print(line)  # 従来どおりコンソールにも出力
+            print(line)  # コンソールにも出力
         lines.extend(block)
 
     for obj in generated_objs:
