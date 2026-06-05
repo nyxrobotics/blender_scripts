@@ -17,8 +17,9 @@ URDF/xacro 用のバウンディングボックスを生成したり、メッシ
 ## 動作環境
 
 - Blender **2.80 以降**（2.x / 3.x / 4.x / 5.x に対応）
-- Make Solid Manifold の **Voxel Remesh** 方式は Blender **2.82 以降**が必要です
-  （それ以前では **Convex Hull** 方式を使用してください）。
+- Make Solid Manifold の **Voxel Remesh** 方式は、Blender 2.82 以降では OpenVDB
+  ボクセルを、2.80 / 2.81 では従来の Remesh(octree) を自動的に使い分けます
+  （どのバージョンでも動作します）。
 - バウンディングボックス出力を利用する場合は ROS など URDF を扱う環境
 
 ---
@@ -99,7 +100,7 @@ URDF/xacro へのインポート時に行ってください。
 
 | 方式 | 内容 |
 | --- | --- |
-| `Voxel Remesh` | 凹凸を保持したまま watertight な単体にします。近接したパーツは結合されます（Blender 2.82 以降）。 |
+| `Voxel Remesh` | 凹凸を保持したまま watertight な単体にします。近接したパーツは結合されます（2.82+ はボクセル、2.80/2.81 は従来 Remesh で自動的に近似）。 |
 | `Convex Hull` | 凸包を作成します。確実に 1 つの凸ソリッドになり、離れたパーツも 1 つに統合されます。 |
 
 **オプション**
@@ -131,8 +132,9 @@ URDF/xacro へのインポート時に行ってください。
   Blender を起動）。
 - **メッシュではない / 選択がないと言われる**: Make Solid Manifold はメッシュ
   オブジェクトの選択が必要です。Generate Bounding Box も同様です。
-- **Voxel Remesh が使えない**: Blender 2.82 以降が必要です。それ以前のバージョン
-  では方式を `Convex Hull` にしてください。
+- **古い Blender での Voxel Remesh**: Blender 2.82 未満では、`Voxel Remesh` を
+  選んでも自動的に従来の Remesh(octree) で近似処理します。`Voxel Size` を
+  octree の分割深度に換算して使用するため、結果は近似になります。
 
 ---
 

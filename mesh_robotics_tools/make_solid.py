@@ -8,7 +8,8 @@ Make Solid Manifold
 
 方式:
   - Voxel Remesh : 凹凸を保持したまま watertight な単体にする
-                   （近接したパーツは結合される。Blender 2.82 以降が必要）
+                   （近接したパーツは結合される。Blender 2.82+ は OpenVDB ボクセル、
+                    2.80/2.81 は従来の octree Remesh で自動的に近似する）
   - Convex Hull  : 凸包。確実に 1 つの凸ソリッドになる
                    （離れたパーツも 1 つに統合される）
 
@@ -18,6 +19,7 @@ Make Solid Manifold
 
 import bpy
 import bmesh
+import math
 from bpy.props import (
     EnumProperty,
     FloatProperty,
@@ -34,7 +36,7 @@ class MakeSolidSettings(bpy.types.PropertyGroup):
         name="方式",
         items=[
             ('VOXEL', "Voxel Remesh",
-             "凹凸を保持したまま watertight な単体にする（近接パーツは結合 / 2.82+）"),
+             "凹凸を保持したまま watertight な単体にする（2.82+はボクセル / それ未満は従来Remeshで近似）"),
             ('CONVEX', "Convex Hull",
              "凸包。確実に1つの凸ソリッドになる（離れたパーツも統合）"),
         ],
@@ -128,6 +130,7 @@ class OBJECT_OT_make_solid_manifold(bpy.types.Operator):
         self.work_obj = None
         self._created = []      # 作成したオブジェクト（中断時に削除）
         self._stats = None
+        self._note = ""
         self._timer = None
         self._index = 0
         self._phase = 'show'    # 'show' -> ラベル表示, 'run' -> 実行
@@ -139,7 +142,7 @@ class OBJECT_OT_make_solid_manifold(bpy.types.Operator):
             ("重複頂点を結合", self._step_merge),
         ]
         if self.settings.method == 'VOXEL':
-            self._steps.append(("ボクセルリメッシュ", self._step_voxel))
+            self._steps.append(("リメッシュ（ソリッド化）", self._step_voxel))
         else:
             self._steps.append(("凸包を生成", self._step_convex))
         self._steps += [
@@ -211,7 +214,8 @@ class OBJECT_OT_make_solid_manifold(bpy.types.Operator):
         state = "manifold OK" if nonmani == 0 else ("非多様体エッジ %d 本" % nonmani)
         self.report(
             {'INFO'},
-            "完成: '%s'  (頂点 %d / 面 %d / %s)" % (self.work_obj.name, nv, nf, state),
+            "完成: '%s'  (頂点 %d / 面 %d / %s)%s"
+            % (self.work_obj.name, nv, nf, state, self._note),
         )
         return {'FINISHED'}
 
@@ -274,16 +278,24 @@ class OBJECT_OT_make_solid_manifold(bpy.types.Operator):
         ob = self.work_obj
         self._activate(context, ob)
         mod = ob.modifiers.new("Remesh", 'REMESH')
-        if not _remesh_has_voxel(mod):
-            ob.modifiers.remove(mod)
-            raise RuntimeError(
-                "このBlenderはVoxel Remeshに未対応です。方式を Convex Hull にするか "
-                "Blender 2.82 以降を使用してください。"
-            )
-        mod.mode = 'VOXEL'
-        mod.voxel_size = self.settings.voxel_size
-        if hasattr(mod, "adaptivity"):
-            mod.adaptivity = 0.0
+        if _remesh_has_voxel(mod):
+            # Blender 2.82+ : OpenVDB ボクセルリメッシュ
+            mod.mode = 'VOXEL'
+            mod.voxel_size = self.settings.voxel_size
+            if hasattr(mod, "adaptivity"):
+                mod.adaptivity = 0.0
+        else:
+            # Blender 2.80 / 2.81 : ボクセル方式が無いので、従来の
+            # octree ベース Remesh で voxel_size を近似する（watertight・manifold）。
+            mod.mode = 'SHARP'
+            if hasattr(mod, "use_remove_disconnected"):
+                mod.use_remove_disconnected = False  # パーツを落とさない
+            max_dim = max(ob.dimensions) if ob.dimensions else 0.0
+            vsize = max(self.settings.voxel_size, 1e-6)
+            depth = int(round(math.log2(max_dim / vsize))) if max_dim > 0.0 else 4
+            mod.octree_depth = max(2, min(depth, 8))
+            self._note = ("（Voxel非対応のため従来Remesh octree_depth=%d で近似）"
+                          % mod.octree_depth)
         bpy.ops.object.modifier_apply(modifier=mod.name)
 
     def _step_convex(self, context):
