@@ -1,17 +1,19 @@
-bl_info = {
-    "name": "Generate bounding box shapes",
-    "author": "Jonatan Bijl",
-    "version": (0, 1),
-    "blender": (2, 80, 0),
-    "location": "context menu",
-    "description": "Creates a bounding cube object for each selected object",
-    "category": "Object",
-}
+# -*- coding: utf-8 -*-
+"""
+Generate bounding box shapes (URDF 出力)
+
+選択メッシュごとにバウンディングボックスを生成し、ROS(URDF)向けの
+<origin> / <geometry> タグをコンソールへ出力する。
+
+元スクリプト: bbx.py / author: Jonatan Bijl
+機能（計算・出力内容）は元のまま変更していません。
+"""
 
 import bpy
 import mathutils
-from bpy.props import StringProperty
 import math
+from bpy.props import StringProperty
+
 
 def main(context, prefix):
     # make a list of the selected objects of type 'mesh'
@@ -34,7 +36,7 @@ def main(context, prefix):
         dz = maxz - minz
 
         new_name = f'{prefix}{obj.name}'
-        
+
         loc = mathutils.Vector(((minx + 0.5 * dx), (miny + 0.5 * dy), (minz + 0.5 * dz)))
         loc.rotate(obj.rotation_euler)
         loc = loc + obj.location
@@ -42,7 +44,7 @@ def main(context, prefix):
         # Convert Blender coordinates to ROS coordinates by rotating -90 degrees around Z-axis
         rotation_matrix = mathutils.Matrix.Rotation(-math.radians(90), 4, 'Z')
         ros_loc = rotation_matrix @ loc
-        
+
         # Also rotate the orientation to match ROS coordinate system
         ros_rotation_euler = obj.rotation_euler.copy()
         ros_rotation_euler.rotate(rotation_matrix)
@@ -60,10 +62,9 @@ def main(context, prefix):
 
         new_obj.name = new_name
         new_obj.dimensions = mathutils.Vector((dx, dy, dz))
-        
+
         # Apply the rotation after creation
         new_obj.rotation_euler = obj.rotation_euler
-
 
         generated_objs.append(new_obj)
 
@@ -76,13 +77,18 @@ def main(context, prefix):
     for obj in generated_objs:
         obj.select_set(True)
 
+
 class GenerateBoundingBoxesOperator(bpy.types.Operator):
     """Create a joined copy of selected meshes, with modifiers applied if needed"""
     bl_idname = "object.generate_bounding_boxes"
     bl_label = "Generate bounding box shapes for all selected objects"
     bl_options = {'REGISTER', 'UNDO'}
 
-    name_prefix: StringProperty(name='name_prefix', description='The name prefix for the new objects', default='UCX_')
+    name_prefix: StringProperty(
+        name='name_prefix',
+        description='The name prefix for the new objects',
+        default='UCX_',
+    )
 
     @classmethod
     def poll(cls, context):
@@ -92,14 +98,6 @@ class GenerateBoundingBoxesOperator(bpy.types.Operator):
         main(context, self.name_prefix)
         return {'FINISHED'}
 
-def register():
-    bpy.utils.register_class(GenerateBoundingBoxesOperator)
 
-def unregister():
-    bpy.utils.unregister_class(GenerateBoundingBoxesOperator)
-
-if __name__ == "__main__":
-    register()
-
-    # test call
-    bpy.ops.object.generate_bounding_boxes()
+def menu_func(self, context):
+    self.layout.operator(GenerateBoundingBoxesOperator.bl_idname)
